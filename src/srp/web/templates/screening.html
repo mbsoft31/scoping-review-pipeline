@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="screeningApp()" x-init="init()" class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Screen Papers (Phase 1.5)</h1>
+
+        <p class="text-gray-600 mb-8">
+            Intelligently screen papers using semantic matching, inclusion/exclusion criteria, and domain vocabulary.
+        </p>
+
+        <!-- Tabs -->
+        <div class="border-b border-gray-200 mb-6">
+            <nav class="flex -mb-px">
+                <button
+                    @click="activeTab = 'config'"
+                    :class="activeTab === 'config' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                    class="py-4 px-6 border-b-2 font-medium text-sm"
+                >
+                    Configuration
+                </button>
+                <button
+                    @click="activeTab = 'criteria'"
+                    :class="activeTab === 'criteria' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                    class="py-4 px-6 border-b-2 font-medium text-sm"
+                >
+                    Criteria
+                </button>
+                <button
+                    @click="activeTab = 'vocabulary'"
+                    :class="activeTab === 'vocabulary' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                    class="py-4 px-6 border-b-2 font-medium text-sm"
+                >
+                    Vocabulary
+                </button>
+            </nav>
+        </div>
+
+        <!-- Configuration Tab -->
+        <div x-show="activeTab === 'config'" class="space-y-6">
+            <form @submit.prevent="startScreening">
+                <!-- Select Phase 1 Directory -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Phase 1 Results
+                    </label>
+                    <select
+                        x-model="config.phase1_dir"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required
+                    >
+                        <option value="">Select Phase 1 directory...</option>
+                        {% for dir in phase1_dirs %}
+                        <option value="{{ dir }}">{{ dir.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Screening Mode -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Screening Mode
+                    </label>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <label class="relative flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50"
+                               :class="config.mode === 'auto' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+                            <input type="radio" x-model="config.mode" value="auto" class="sr-only">
+                            <div class="flex-1">
+                                <div class="text-sm font-medium text-gray-900">🤖 Auto</div>
+                                <div class="text-xs text-gray-500">Fully automated</div>
+                            </div>
+                        </label>
+                        <label class="relative flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50"
+                               :class="config.mode === 'semi_auto' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+                            <input type="radio" x-model="config.mode" value="semi_auto" class="sr-only">
+                            <div class="flex-1">
+                                <div class="text-sm font-medium text-gray-900">⚡ Semi-Auto</div>
+                                <div class="text-xs text-gray-500">Auto + review</div>
+                            </div>
+                        </label>
+                        <label class="relative flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50"
+                               :class="config.mode === 'hitl' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+                            <input type="radio" x-model="config.mode" value="hitl" class="sr-only">
+                            <div class="flex-1">
+                                <div class="text-sm font-medium text-gray-900">👤 HITL</div>
+                                <div class="text-xs text-gray-500">Human-in-loop</div>
+                            </div>
+                        </label>
+                        <label class="relative flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50"
+                               :class="config.mode === 'manual' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'">
+                            <input type="radio" x-model="config.mode" value="manual" class="sr-only">
+                            <div class="flex-1">
+                                <div class="text-sm font-medium text-gray-900">✍️ Manual</div>
+                                <div class="text-xs text-gray-500">Fully manual</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Thresholds -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Auto-Decision Threshold
+                        </label>
+                        <input
+                            type="range"
+                            x-model.number="config.auto_threshold"
+                            min="0.5" max="1.0" step="0.05"
+                            class="w-full"
+                        >
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0.5</span>
+                            <span class="font-semibold" x-text="config.auto_threshold"></span>
+                            <span>1.0</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Higher = more conservative automatic decisions</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Maybe Threshold
+                        </label>
+                        <input
+                            type="range"
+                            x-model.number="config.maybe_threshold"
+                            min="0.3" max="0.8" step="0.05"
+                            class="w-full"
+                        >
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0.3</span>
+                            <span class="font-semibold" x-text="config.maybe_threshold"></span>
+                            <span>0.8</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Papers between thresholds go to “Maybe”</p>
+                    </div>
+                </div>
+
+                <!-- Model Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Semantic Model
+                    </label>
+                    <select
+                        x-model="config.model"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="all-MiniLM-L6-v2">all-MiniLM-L6-v2 (Fast, lightweight)</option>
+                        <option value="all-mpnet-base-v2">all-mpnet-base-v2 (Better quality)</option>
+                        <option value="paraphrase-multilingual-MiniLM-L12-v2">Multilingual (50+ languages)</option>
+                    </select>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    :disabled="loading || !config.phase1_dir || config.inclusion_criteria.length === 0"
+                    class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition"
+                >
+                    <span x-show="!loading">🔍 Start Screening</span>
+                    <span x-show="loading">⏳ Starting...</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Criteria Tab -->
+        <div x-show="activeTab === 'criteria'" class="space-y-6">
+            <!-- Inclusion Criteria -->
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Inclusion Criteria</h3>
+                    <button
+                        @click="addCriterion('inclusion')"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium"
+                    >
+                        + Add Criterion
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="(criterion, index) in config.inclusion_criteria" :key="index">
+                        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div class="flex items-start justify-between mb-3">
+                                <input
+                                    type="text"
+                                    x-model="criterion.name"
+                                    placeholder="Criterion name"
+                                    class="flex-1 px-3 py-2 border border-gray-300 rounded font-medium"
+                                >
+                                <button
+                                    @click="config.inclusion_criteria.splice(index, 1)"
+                                    class="ml-2 text-red-600 hover:text-red-800"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <textarea
+                                x-model="criterion.description"
+                                placeholder="Description"
+                                rows="2"
+                                class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                            ></textarea>
+                            <input
+                                type="text"
+                                x-model="criterion.semantic_query"
+                                placeholder="Semantic query (natural language)"
+                                class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                            >
+                            <div class="flex items-center space-x-4">
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" x-model="criterion.is_mandatory" class="text-blue-600">
+                                    <span class="text-sm text-gray-700">Mandatory</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-sm text-gray-600">Weight:</span>
+                                    <input
+                                        type="number"
+                                        x-model.number="criterion.weight"
+                                        min="0" max="2" step="0.1"
+                                        class="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="config.inclusion_criteria.length === 0" class="text-center py-8 text-gray-500">
+                        No inclusion criteria added yet
+                    </div>
+                </div>
+            </div>
+            <!-- Exclusion Criteria -->
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Exclusion Criteria</h3>
+                    <button
+                        @click="addCriterion('exclusion')"
+                        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium"
+                    >
+                        + Add Criterion
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="(criterion, index) in config.exclusion_criteria" :key="index">
+                        <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                            <div class="flex items-start justify-between mb-3">
+                                <input
+                                    type="text"
+                                    x-model="criterion.name"
+                                    placeholder="Criterion name"
+                                    class="flex-1 px-3 py-2 border border-gray-300 rounded font-medium"
+                                >
+                                <button
+                                    @click="config.exclusion_criteria.splice(index, 1)"
+                                    class="ml-2 text-red-600 hover:text-red-800"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <textarea
+                                x-model="criterion.description"
+                                placeholder="Description"
+                                rows="2"
+                                class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                            ></textarea>
+                            <input
+                                type="text"
+                                x-model="criterion.semantic_query"
+                                placeholder="Semantic query"
+                                class="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                            >
+                        </div>
+                    </template>
+                    <div x-show="config.exclusion_criteria.length === 0" class="text-center py-8 text-gray-500">
+                        No exclusion criteria added yet
+                    </div>
+                </div>
+            </div>
+            <!-- Template Buttons -->
+            <div class="border-t border-gray-200 pt-6">
+                <p class="text-sm text-gray-600 mb-3">Quick templates:</p>
+                <div class="flex flex-wrap gap-2">
+                    <button
+                        @click="loadTemplate('ml_fairness')"
+                        class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm"
+                    >
+                        ML Fairness
+                    </button>
+                    <button
+                        @click="loadTemplate('clinical')"
+                        class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm"
+                    >
+                        Clinical Research
+                    </button>
+                    <button
+                        @click="loadTemplate('software_engineering')"
+                        class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm"
+                    >
+                        Software Engineering
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vocabulary Tab -->
+        <div x-show="activeTab === 'vocabulary'" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Domain Name
+                </label>
+                <input
+                    type="text"
+                    x-model="config.vocabulary.domain"
+                    placeholder="e.g., Machine Learning Fairness"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                >
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Domain Concepts (one per line)
+                </label>
+                <textarea
+                    x-model="vocabularyConcepts"
+                    @input="updateVocabularyConcepts()"
+                    rows="10"
+                    placeholder="fairness metrics\nbias detection\ndisparate impact\nequal opportunity"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                ></textarea>
+                <p class="text-xs text-gray-500 mt-1">
+                    <span x-text="config.vocabulary.concepts.length"></span> concepts defined
+                </p>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div x-show="jobId" class="mt-8 p-6 bg-blue-50 rounded-lg" x-cloak>
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Screening Progress</h3>
+            <div
+                hx-get="/api/jobs/:jobId/progress"
+                hx-trigger="every 2s"
+                hx-swap="innerHTML"
+                :hx-get="`/api/jobs/${jobId}/progress`"
+            >
+                Loading progress...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function screeningApp() {
+    return {
+        activeTab: 'config',
+        loading: false,
+        jobId: null,
+        config: {
+            phase1_dir: '',
+            mode: 'auto',
+            auto_threshold: 0.75,
+            maybe_threshold: 0.5,
+            model: 'all-MiniLM-L6-v2',
+            inclusion_criteria: [],
+            exclusion_criteria: [],
+            vocabulary: {
+                domain: '',
+                concepts: [],
+            }
+        },
+        vocabularyConcepts: '',
+        init() {
+            const saved = localStorage.getItem('screening_config');
+            if (saved) {
+                this.config = JSON.parse(saved);
+                this.vocabularyConcepts = this.config.vocabulary.concepts.join('\n');
+            }
+        },
+        addCriterion(type) {
+            const criterion = {
+                criterion_id: `${type}_${Date.now()}`,
+                name: '',
+                description: '',
+                criterion_type: type,
+                keywords: [],
+                semantic_query: '',
+                weight: 1.0,
+                is_mandatory: false,
+            };
+            if (type === 'inclusion') {
+                this.config.inclusion_criteria.push(criterion);
+            } else {
+                this.config.exclusion_criteria.push(criterion);
+            }
+        },
+        updateVocabularyConcepts() {
+            this.config.vocabulary.concepts = this.vocabularyConcepts
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+        },
+        loadTemplate(template) {
+            if (template === 'ml_fairness') {
+                this.config.inclusion_criteria = [
+                    {
+                        criterion_id: 'inc_ml_fairness',
+                        name: 'Machine Learning Fairness',
+                        description: 'Addresses fairness, bias, or equity in ML systems',
+                        semantic_query: 'This paper discusses fairness, bias, or discrimination in machine learning',
+                        weight: 1.0,
+                        is_mandatory: true,
+                    },
+                    {
+                        criterion_id: 'inc_empirical',
+                        name: 'Empirical Study',
+                        description: 'Includes experiments or case studies',
+                        semantic_query: 'This paper presents empirical evaluation or experiments',
+                        weight: 0.8,
+                        is_mandatory: false,
+                    }
+                ];
+                this.config.exclusion_criteria = [
+                    {
+                        criterion_id: 'exc_workshop',
+                        name: 'Workshop Paper',
+                        description: 'Workshop or poster paper',
+                        semantic_query: 'This is a workshop paper or poster',
+                        weight: 0.9,
+                        is_mandatory: false,
+                    }
+                ];
+                this.vocabularyConcepts = 'fairness metrics\nbias detection\ndisparate impact\nequal opportunity\ndemographic parity';
+                this.updateVocabularyConcepts();
+            }
+            alert(`Loaded ${template} template`);
+        },
+        async startScreening() {
+            this.loading = true;
+            localStorage.setItem('screening_config', JSON.stringify(this.config));
+            try {
+                const response = await fetch('/api/screening/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.config),
+                });
+                const data = await response.json();
+                this.jobId = data.job_id;
+                htmx.process(document.body);
+            } catch (error) {
+                alert('Error starting screening: ' + error.message);
+            } finally {
+                this.loading = false;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

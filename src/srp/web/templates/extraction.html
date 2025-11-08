@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="extractionApp()" class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Data Extraction</h1>
+        <p class="text-gray-600">
+            Automatically extract outcomes, effect sizes, and quality indicators from full‑text papers.
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">📄 Full‑Text Retrieval</h3>
+            <div class="space-y-3">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" x-model="config.use_open_access" class="text-blue-600">
+                    <span class="text-sm">Use open access PDFs</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" x-model="config.use_unpaywall" class="text-blue-600">
+                    <span class="text-sm">Query Unpaywall API</span>
+                </label>
+                <div x-show="config.use_unpaywall" class="ml-6">
+                    <input type="email" x-model="config.unpaywall_email" placeholder="your.email@institution.edu" class="w-full px-3 py-2 border rounded text-sm">
+                </div>
+            </div>
+        </div>
+        <!-- Input directory selection -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">📁 Select input directory</h3>
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Phase directory</label>
+                <select x-model="phaseDir" class="w-full px-3 py-2 border rounded text-sm" required>
+                    <option value="">Select a directory...</option>
+                    {% for dir in phase_dirs %}
+                    <option value="{{ dir }}">{{ dir.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Choose a Phase 1 (search), Phase 1.5 (screening) or Phase 2 (deduplicated) directory.</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">🎯 Extraction Targets</h3>
+            <div class="space-y-2">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" x-model="config.extract_sample_size" checked class="text-blue-600">
+                    <span class="text-sm">Sample sizes</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" x-model="config.extract_outcomes" checked class="text-blue-600">
+                    <span class="text-sm">Outcomes & effect sizes</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" x-model="config.extract_statistics" checked class="text-blue-600">
+                    <span class="text-sm">P‑values & CIs</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" x-model="config.extract_methods" checked class="text-blue-600">
+                    <span class="text-sm">Statistical methods</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <button @click="startExtraction()" :disabled="loading || !phaseDir" class="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg">
+            <span x-show="!loading">🔬 Start Data Extraction</span>
+            <span x-show="loading">⏳ Extracting...</span>
+        </button>
+    </div>
+    <!-- Progress and results -->
+    <div x-show="jobId" class="mt-6 p-6 bg-purple-50 rounded-lg" x-cloak>
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Extraction Progress</h3>
+        <div hx-get="/api/jobs/:jobId/progress" hx-trigger="every 2s" hx-swap="innerHTML" :hx-get="`/api/jobs/${jobId}/progress`">
+            Loading progress...
+        </div>
+    </div>
+</div>
+
+<script>
+function extractionApp() {
+    return {
+        config: {
+            use_open_access: true,
+            use_unpaywall: true,
+            unpaywall_email: '',
+            extract_sample_size: true,
+            extract_outcomes: true,
+            extract_statistics: true,
+            extract_methods: true,
+        },
+        loading: false,
+        phaseDir: '',
+        jobId: null,
+        async startExtraction() {
+            this.loading = true;
+            try {
+                const payload = {
+                    phase_dir: this.phaseDir,
+                    use_open_access: this.config.use_open_access,
+                    use_unpaywall: this.config.use_unpaywall,
+                    unpaywall_email: this.config.unpaywall_email,
+                    extract_sample_size: this.config.extract_sample_size,
+                    extract_outcomes: this.config.extract_outcomes,
+                    extract_statistics: this.config.extract_statistics,
+                    extract_methods: this.config.extract_methods,
+                };
+                const response = await fetch('/api/extraction/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                this.jobId = data.job_id;
+                // Trigger HTMX processing
+                if (window.htmx) {
+                    window.htmx.process(document.body);
+                }
+            } catch (err) {
+                alert('Extraction failed: ' + err.message);
+            } finally {
+                this.loading = false;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

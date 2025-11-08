@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Systematic Review Pipeline{% endblock %}
+
+{% block content %}
+<div x-data="dashboard()" x-init="init()">
+    <!-- Hero section -->
+    <div class="bg-white rounded-lg shadow p-8 mb-8">
+        <h1 class="text-4xl font-bold text-gray-800 mb-4">Systematic Review Pipeline</h1>
+        <p class="text-gray-600 text-lg">Automated literature search and analysis across multiple academic databases.</p>
+    </div>
+    <!-- Quick statistics cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white rounded-lg shadow p-6 flex justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Cached Queries</p>
+                <p class="text-3xl font-bold text-green-600" x-text="stats.cached_queries"></p>
+            </div>
+            <div class="text-green-500 text-4xl">🗄️</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 flex justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Active Jobs</p>
+                <p class="text-3xl font-bold text-blue-600" x-text="stats.active_jobs"></p>
+            </div>
+            <div class="text-blue-500 text-4xl">⚙️</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 flex justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Phase 1 Runs</p>
+                <p class="text-3xl font-bold text-purple-600" x-text="stats.phase1_runs"></p>
+            </div>
+            <div class="text-purple-500 text-4xl">🔍</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 flex justify-between">
+            <div>
+                <p class="text-gray-500 text-sm">Phase 2 Runs</p>
+                <p class="text-3xl font-bold text-yellow-600" x-text="stats.phase2_runs"></p>
+            </div>
+            <div class="text-yellow-500 text-4xl">📊</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

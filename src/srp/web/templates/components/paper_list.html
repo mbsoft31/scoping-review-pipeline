@@ -1,0 +1,62 @@
+<div class="divide-y divide-gray-200">
+    {% for paper in papers %}
+    <div class="p-6 hover:bg-gray-50 transition">
+        <!-- Title -->
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">{{ paper.title }}</h3>
+        <!-- Authors -->
+        {% if paper.authors %}
+        <p class="text-sm text-gray-600 mb-2">
+            {% for author in paper.authors[:3] %}
+                {{ author.name if author.name else author }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+            {% if paper.authors|length > 3 %}<span class="text-gray-400"> et al.</span>{% endif %}
+        </p>
+        {% endif %}
+        <!-- Metadata -->
+        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500 mb-3">
+            {% if paper.year %}
+            <span class="flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span>{{ paper.year|int }}</span>
+            </span>
+            {% endif %}
+            {% if paper.venue %}
+            <span class="flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                <span>{{ paper.venue[:50] }}{% if paper.venue|length > 50 %}…{% endif %}</span>
+            </span>
+            {% endif %}
+            {% if paper.citation_count %}
+            <span class="flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                <span>{{ paper.citation_count|int }} citations</span>
+            </span>
+            {% endif %}
+        </div>
+        <!-- Abstract truncated -->
+        {% if paper.abstract %}
+        <p class="text-sm text-gray-700 line-clamp-2 mb-3">{{ paper.abstract[:200] }}{% if paper.abstract|length > 200 %}…{% endif %}</p>
+        {% endif %}
+        <!-- Badges -->
+        <div class="flex flex-wrap gap-2 mb-3">
+            {% if paper.doi %}
+            <a href="https://doi.org/{{ paper.doi }}" target="_blank" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">DOI</a>
+            {% endif %}
+            {% if paper.arxiv_id %}
+            <a href="https://arxiv.org/abs/{{ paper.arxiv_id }}" target="_blank" class="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">arXiv</a>
+            {% endif %}
+            {% if paper.is_open_access %}
+            <span class="inline-flex items-center px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Open Access</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% if total_pages > 1 %}
+    <!-- Pagination controls -->
+    <div class="p-4 flex justify-between items-center">
+        <button {% if page <= 1 %}disabled{% endif %} hx-get="/api/results/{{ phase_dir }}/papers?page={{ page - 1 }}" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-600 disabled:opacity-50">Prev</button>
+        <span class="text-sm text-gray-700">Page {{ page }} of {{ total_pages }}</span>
+        <button {% if page >= total_pages %}disabled{% endif %} hx-get="/api/results/{{ phase_dir }}/papers?page={{ page + 1 }}" hx-swap="innerHTML" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-600 disabled:opacity-50">Next</button>
+    </div>
+    {% endif %}
+</div>

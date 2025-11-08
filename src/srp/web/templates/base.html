@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Systematic Review Pipeline{% endblock %}</title>
+    <!-- Tailwind via CDN for rapid prototyping -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- HTMX for partial page updates -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- Alpine.js for reactive components -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+    <!-- Chart.js (loaded on demand) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- Navigation bar -->
+    <nav class="bg-blue-600 text-white shadow">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-8">
+                    <a href="/" class="text-xl font-bold">📚 SRP</a>
+                    <div class="hidden md:flex space-x-4">
+                        <a href="/" class="hover:bg-blue-700 px-3 py-2 rounded">Dashboard</a>
+                        <a href="/search" class="hover:bg-blue-700 px-3 py-2 rounded">Search</a>
+                        <a href="/analyze" class="hover:bg-blue-700 px-3 py-2 rounded">Analyze</a>
+                        <a href="/results" class="hover:bg-blue-700 px-3 py-2 rounded">Results</a>
+                        <a href="/screening" class="hover:bg-blue-700 px-3 py-2 rounded">Screen</a>
+                        <a href="/extraction" class="hover:bg-blue-700 px-3 py-2 rounded">Extract</a>
+                        <a href="/quality" class="hover:bg-blue-700 px-3 py-2 rounded">Quality</a>
+                        <a href="/prisma" class="hover:bg-blue-700 px-3 py-2 rounded">PRISMA</a>
+                        <a href="/meta" class="hover:bg-blue-700 px-3 py-2 rounded">Meta</a>
+                        <a href="/review" class="hover:bg-blue-700 px-3 py-2 rounded">Review</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <!-- Main content area -->
+    <main class="flex-1 container mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-300 py-6">
+        <div class="container mx-auto text-center">
+            <p>Systematic Review Pipeline</p>
+        </div>
+    </footer>
+    <!-- App-specific JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

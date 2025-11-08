@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  srp-web:
+    build: .
+    container_name: srp-web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./cache:/cache
+      - ./output:/app/output
+      - ./.env:/app/.env:ro
+    environment:
+      - OUTPUT_DIR=/app/output
+      - CACHE_DIR=/cache
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    networks:
+      - srp-network
+
+  srp-worker:
+    build: .
+    container_name: srp-worker
+    command: python -m srp.worker
+    volumes:
+      - ./data:/data
+      - ./cache:/cache
+      - ./output:/app/output
+      - ./.env:/app/.env:ro
+    environment:
+      - OUTPUT_DIR=/app/output
+      - CACHE_DIR=/cache
+      - LOG_LEVEL=INFO
+    depends_on:
+      - srp-web
+    restart: unless-stopped
+    networks:
+      - srp-network
+
+networks:
+  srp-network:
+    driver: bridge
+
+volumes:
+  data:
+  cache:
+  output:

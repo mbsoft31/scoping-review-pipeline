@@ -1,0 +1,47 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+
+# Generated outputs and caches
+output/
+.cache/
+*.db
+*.sqlite
+*.parquet
+
+# Version control
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+
+# Testing artifacts
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# CI/CD configs
+.github/
+.gitlab-ci.yml
+
+# Environment files
+.env.local
+.env.*.local

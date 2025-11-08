@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "systematic-review-pipeline"
+version = "0.1.0"
+description = "Modular pipeline for systematic literature reviews"
+requires-python = ">=3.11"
+readme = "README.md"
+
+[project.scripts]
+srp = "srp.cli.main:app"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"

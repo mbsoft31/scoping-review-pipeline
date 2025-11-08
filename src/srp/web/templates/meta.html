@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="metaApp()" class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Meta‑Analysis</h1>
+        <p class="text-gray-600">
+            Perform a statistical meta‑analysis by uploading a CSV file of effect estimates and standard errors.
+        </p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Upload Effect Size Data</h3>
+        <form @submit.prevent="startMeta" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">CSV file (.csv)</label>
+                <input type="file" @change="handleFile" accept=".csv" class="w-full px-4 py-2 border rounded-lg text-sm" required>
+                <p class="text-xs text-gray-500 mt-1">The file must contain columns for study identifiers, effect estimates and standard errors.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Study ID column</label>
+                    <input type="text" x-model="form.study_col" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="study_id">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Effect column</label>
+                    <input type="text" x-model="form.effect_col" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="effect">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Standard error column</label>
+                    <input type="text" x-model="form.se_col" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="se">
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Pooling method</label>
+                <select x-model="form.method" class="w-full px-3 py-2 border rounded-lg text-sm">
+                    <option value="random">Random effects</option>
+                    <option value="fixed">Fixed effect</option>
+                </select>
+            </div>
+            <button type="submit" :disabled="loading || !file" class="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg">
+                <span x-show="!loading">🧮 Run Meta‑Analysis</span>
+                <span x-show="loading">⏳ Processing...</span>
+            </button>
+        </form>
+    </div>
+    <!-- Progress and results -->
+    <div x-show="jobId" class="mt-6 p-6 bg-teal-50 rounded-lg" x-cloak>
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">Meta‑Analysis Progress</h3>
+        <div hx-get="/api/jobs/:jobId/progress" hx-trigger="every 2s" hx-swap="innerHTML" :hx-get="`/api/jobs/${jobId}/progress`">
+            Loading progress...
+        </div>
+        <div x-show="result && !loading" class="mt-6">
+            <h4 class="text-lg font-semibold text-gray-800 mb-2">Results</h4>
+            <p class="text-gray-700 text-sm mb-2"><strong>Pooled effect:</strong> <span x-text="result.pooled.pooled_effect.toFixed(4)"></span> ± <span x-text="result.pooled.standard_error.toFixed(4)"></span></p>
+            <p class="text-gray-700 text-sm mb-2"><strong>Heterogeneity (I²):</strong> <span x-text="result.heterogeneity.I_squared.toFixed(1)"></span>% (<span x-text="result.heterogeneity.interpretation"></span>)</p>
+            <p class="text-gray-700 text-sm mb-2"><strong>Publication bias:</strong> <span x-text="result.bias.interpretation"></span></p>
+            <div class="mt-4">
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">Forest Plot</h4>
+                <img :src="`/api/meta/${jobId}/plot`" alt="Forest plot" class="w-full max-w-3xl border rounded shadow" x-show="!loading">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function metaApp() {
+    return {
+        form: {
+            method: 'random',
+            effect_col: 'effect',
+            se_col: 'se',
+            study_col: 'study_id',
+        },
+        file: null,
+        loading: false,
+        jobId: null,
+        result: null,
+        handleFile(event) {
+            const files = event.target.files;
+            if (files && files.length > 0) {
+                this.file = files[0];
+            }
+        },
+        async startMeta() {
+            this.loading = true;
+            try {
+                const fd = new FormData();
+                fd.append('method', this.form.method);
+                fd.append('effect_col', this.form.effect_col);
+                fd.append('se_col', this.form.se_col);
+                fd.append('study_col', this.form.study_col);
+                fd.append('file', this.file);
+                const resp = await fetch('/api/meta/start', {
+                    method: 'POST',
+                    body: fd,
+                });
+                const data = await resp.json();
+                this.jobId = data.job_id;
+                this.pollProgress();
+                if (window.htmx) {
+                    window.htmx.process(document.body);
+                }
+            } catch (err) {
+                alert('Meta‑analysis failed: ' + err.message);
+            } finally {
+                this.loading = false;
+            }
+        },
+        pollProgress() {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/jobs/${this.jobId}`);
+                    const job = await res.json();
+                    if (job.status === 'completed') {
+                        clearInterval(interval);
+                        this.result = job.result;
+                    } else if (job.status === 'failed') {
+                        clearInterval(interval);
+                        alert('Meta‑analysis failed: ' + job.error);
+                    }
+                } catch (err) {
+                    console.error('Error polling meta job:', err);
+                }
+            }, 2000);
+        },
+    };
+}
+</script>
+{% endblock %}

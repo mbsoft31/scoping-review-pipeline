@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="reviewApp()" x-init="init()" class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Human Review Interface</h1>
+        <p class="text-gray-600">Review uncertain papers and override automated decisions</p>
+    </div>
+    <!-- Select Screening Session -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            Select Screening Session
+        </label>
+        <select
+            x-model="selectedDir"
+            @change="loadSession()"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg"
+        >
+            <option value="">Choose a session...</option>
+            {% for dir in screening_dirs %}
+            <option value="{{ dir.path }}">{{ dir.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <!-- Statistics -->
+    <div x-show="stats" class="bg-white rounded-lg shadow-lg p-6 mb-6" x-cloak>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Progress</h3>
+        <div class="grid grid-cols-4 gap-4 mb-4">
+            <div class="text-center">
+                <div class="text-3xl font-bold text-blue-600" x-text="stats.total"></div>
+                <div class="text-sm text-gray-600">Total</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-green-600" x-text="stats.reviewed"></div>
+                <div class="text-sm text-gray-600">Reviewed</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-orange-600" x-text="stats.remaining"></div>
+                <div class="text-sm text-gray-600">Remaining</div>
+            </div>
+            <div class="text-center">
+                <div class="text-3xl font-bold text-purple-600" x-text="((stats.reviewed / stats.total) * 100).toFixed(0) + '%' "></div>
+                <div class="text-sm text-gray-600">Complete</div>
+            </div>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-2">
+            <div
+                class="bg-green-600 h-2 rounded-full transition-all"
+                :style="`width: ${(stats.reviewed / stats.total) * 100}%`"
+            ></div>
+        </div>
+    </div>
+    <!-- Reviewer Name -->
+    <div x-show="selectedDir && !reviewerName" class="bg-white rounded-lg shadow-lg p-6 mb-6" x-cloak>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            Your Name/ID
+        </label>
+        <div class="flex space-x-3">
+            <input
+                type="text"
+                x-model="tempReviewerName"
+                placeholder="Enter your name"
+                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+                @keyup.enter="setReviewer()"
+            >
+            <button
+                @click="setReviewer()"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium"
+            >
+                Start Reviewing
+            </button>
+        </div>
+    </div>
+    <!-- Review Cards -->
+    <div x-show="reviewerName && currentPaper" x-cloak>
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+            <!-- Paper Header -->
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm opacity-90">
+                        Paper <span x-text="currentIndex + 1"></span> of <span x-text="papers.length"></span>
+                    </span>
+                    <span class="text-sm opacity-90" x-text="currentPaper.year"></span>
+                </div>
+                <h2 class="text-2xl font-bold" x-text="currentPaper.title"></h2>
+                <p class="mt-2 opacity-90" x-text="currentPaper.authors"></p>
+            </div>
+            <!-- Auto-Screening Result -->
+            <div class="bg-gray-50 border-b border-gray-200 p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-sm text-gray-600">Auto-screening decision:</span>
+                        <span
+                            class="ml-2 px-3 py-1 rounded-full text-sm font-medium"
+                            :class="{
+                                'bg-green-100 text-green-800': currentPaper.auto_decision === 'include',
+                                'bg-red-100 text-red-800': currentPaper.auto_decision === 'exclude',
+                                'bg-yellow-100 text-yellow-800': currentPaper.auto_decision === 'maybe',
+                            }"
+                            x-text="currentPaper.auto_decision"
+                        ></span>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        Confidence: <span class="font-semibold" x-text="(currentPaper.auto_confidence * 100).toFixed(0) + '%' "></span>
+                    </div>
+                </div>
+                <!-- Reasons -->
+                <div x-show="currentPaper.exclusion_reasons" class="mt-3">
+                    <div class="text-xs text-gray-600 mb-1">Exclusion reasons:</div>
+                    <div class="text-sm text-red-700" x-text="currentPaper.exclusion_reasons"></div>
+                </div>
+                <div x-show="currentPaper.inclusion_tags" class="mt-3">
+                    <div class="text-xs text-gray-600 mb-1">Inclusion tags:</div>
+                    <div class="text-sm text-green-700" x-text="currentPaper.inclusion_tags"></div>
+                </div>
+            </div>
+            <!-- Paper Content -->
+            <div class="p-6">
+            </div>
+            <!-- Decision Buttons -->
+            <div class="bg-gray-50 border-t border-gray-200 p-6">
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <button
+                        @click="submitDecision('include')"
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition transform hover:scale-105"
+                    >
+                        ✓ Include
+                    </button>
+                    <button
+                        @click="submitDecision('maybe')"
+                        class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-6 rounded-lg transition transform hover:scale-105"
+                    >
+                        ? Maybe
+                    </button>
+                    <button
+                        @click="submitDecision('exclude')"
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-lg transition transform hover:scale-105"
+                    >
+                        ✗ Exclude
+                    </button>
+                </div>
+                <textarea
+                    x-model="notes"
+                    placeholder="Notes (optional)"
+                    rows="2"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm"
+                ></textarea>
+                <div class="flex justify-between items-center mt-4">
+                    <button
+                        @click="skipPaper()"
+                        class="text-gray-600 hover:text-gray-800 text-sm font-medium"
+                    >
+                        ⏭ Skip
+                    </button>
+                    <div class="flex space-x-2">
+                        <button
+                            @click="previousPaper()"
+                            :disabled="currentIndex === 0"
+                            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded text-sm font-medium"
+                        >
+                            ← Previous
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <div class="text-2xl font-bold text-green-600" x-text="sessionStats.included || 0"></div>
+                <div class="text-sm text-gray-600">Included</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <div class="text-2xl font-bold text-yellow-600" x-text="sessionStats.maybe || 0"></div>
+                <div class="text-sm text-gray-600">Maybe</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <div class="text-2xl font-bold text-red-600" x-text="sessionStats.excluded || 0"></div>
+                <div class="text-sm text-gray-600">Excluded</div>
+            </div>
+        </div>
+    </div>
+    <!-- No papers to review -->
+    <div x-show="reviewerName && papers.length === 0" class="bg-white rounded-lg shadow-lg p-12 text-center" x-cloak>
+        <div class="text-6xl mb-4">🎉</div>
+        <h3 class="text-2xl font-bold text-gray-800 mb-2">All Done!</h3>
+        <p class="text-gray-600">No more papers to review in this session.</p>
+    </div>
+</div>
+<script>
+function reviewApp() {
+    return {
+        selectedDir: '',
+        reviewerName: '',
+        tempReviewerName: '',
+        stats: null,
+        papers: [],
+        currentIndex: 0,
+        currentPaper: null,
+        notes: '',
+        sessionStats: {
+            included: 0,
+            maybe: 0,
+            excluded: 0,
+        },
+        init() {
+            this.reviewerName = localStorage.getItem('reviewer_name') || '';
+            this.tempReviewerName = this.reviewerName;
+        },
+        setReviewer() {
+            if (this.tempReviewerName) {
+                this.reviewerName = this.tempReviewerName;
+                localStorage.setItem('reviewer_name', this.reviewerName);
+                this.loadPapers();
+            }
+        },
+        async loadSession() {
+            if (!this.selectedDir) return;
+            try {
+                const response = await fetch(`/api/review/${this.selectedDir}/stats`);
+                this.stats = await response.json();
+                if (this.reviewerName) {
+                    this.loadPapers();
+                }
+            } catch (error) {
+                alert('Error loading session: ' + error.message);
+            }
+        },
+        async loadPapers() {
+            if (!this.selectedDir) return;
+            try {
+                const response = await fetch(`/api/review/${this.selectedDir}/next?n=20`);
+                this.papers = await response.json();
+                if (this.papers.length > 0) {
+                    this.currentPaper = this.papers[0];
+                    this.currentIndex = 0;
+                }
+            } catch (error) {
+                alert('Error loading papers: ' + error.message);
+            }
+        },
+        async submitDecision(decision) {
+            try {
+                await fetch(`/api/review/${this.selectedDir}/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paper_id: this.currentPaper.paper_id,
+                        decision: decision,
+                        reviewer: this.reviewerName,
+                        notes: this.notes,
+                    }),
+                });
+                this.sessionStats[decision]++;
+                this.notes = '';
+                this.nextPaper();
+                this.loadSession();
+            } catch (error) {
+                alert('Error submitting decision: ' + error.message);
+            }
+        },
+        nextPaper() {
+            if (this.currentIndex < this.papers.length - 1) {
+                this.currentIndex++;
+                this.currentPaper = this.papers[this.currentIndex];
+            } else {
+                this.loadPapers();
+            }
+        },
+        previousPaper() {
+            if (this.currentIndex > 0) {
+                this.currentIndex--;
+                this.currentPaper = this.papers[this.currentIndex];
+            }
+        },
+        skipPaper() {
+            this.nextPaper();
+        }
+    };
+}
+</script>
+{% endblock %}

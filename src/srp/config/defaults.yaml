@@ -1,0 +1,47 @@
+# Query generation defaults
+query_generation:
+  min_terms: 2
+  max_terms: 5
+  use_boolean: true
+  optimize_by_source: true
+
+# Source-specific configurations
+sources:
+  openalex:
+    base_url: "https://api.openalex.org"
+    timeout: 30
+    cursor_pagination: true
+    max_results: 10000
+  semantic_scholar:
+    base_url: "https://api.semanticscholar.org/graph/v1"
+    timeout: 30
+    page_pagination: true
+    default_period: 4
+    per_page_delay: 1.3
+  crossref:
+    base_url: "https://api.crossref.org/works"
+    timeout: 30
+    polite_pool: true
+  arxiv:
+    base_url: "http://export.arxiv.org/api/query"
+    timeout: 60
+    max_results_per_query: 2000
+
+# Deduplication settings
+deduplication:
+  fuzzy_threshold: 0.85
+  title_normalize: true
+  merge_strategy: "best_completeness"
+
+# Citation enrichment
+citation_enrichment:
+  max_papers: 200
+  refs_per_paper: 100
+  fetch_abstracts: true
+
+# Influence scoring weights
+influence_weights:
+  pagerank: 0.30
+  in_degree: 0.25
+  betweenness: 0.20
+  total_citations: 0.25

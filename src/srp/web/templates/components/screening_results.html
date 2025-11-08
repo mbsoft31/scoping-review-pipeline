@@ -1,0 +1,100 @@
+<div class="divide-y divide-gray-200">
+    {% for result in results %}
+    <div class="p-6 hover:bg-gray-50 transition" x-data="{ expanded: false }">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <div class="flex items-center space-x-3 mb-2">
+                    {% if result.decision == 'include' %}
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        ✓ Include
+                    </span>
+                    {% elif result.decision == 'exclude' %}
+                    <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                        ✗ Exclude
+                    </span>
+                    {% elif result.decision == 'maybe' %}
+                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                        ? Maybe
+                    </span>
+                    {% endif %}
+                    <span class="text-sm text-gray-500">
+                        {{ (result.confidence * 100)|round(0) }}% confidence
+                    </span>
+                    <span class="text-xs text-gray-400">
+                        {{ result.mode }}
+                    </span>
+                </div>
+                <h3 class="text-sm font-medium text-gray-800 mb-1">
+                    Paper ID: {{ result.paper_id }}
+                </h3>
+                {% if result.inclusion_tags %}
+                <div class="flex flex-wrap gap-1 mb-2">
+                    {% for tag in result.inclusion_tags[:5] %}
+                    <span class="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">
+                        {{ tag.tag_name }} ({{ (tag.confidence * 100)|round(0) }}%)
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if result.exclusion_reasons %}
+                <div class="mt-2">
+                    <button
+                        @click="expanded = !expanded"
+                        class="text-sm text-red-600 hover:text-red-800"
+                    >
+                        <span x-show="!expanded">▶ Show exclusion reasons</span>
+                        <span x-show="expanded">▼ Hide exclusion reasons</span>
+                    </button>
+                    <div x-show="expanded" class="mt-2 space-y-2" x-cloak>
+                        {% for reason in result.exclusion_reasons %}
+                        <div class="bg-red-50 border border-red-200 rounded p-3">
+                            <div class="font-medium text-sm text-red-800">{{ reason.criterion_name }}</div>
+                            <div class="text-xs text-red-600 mt-1">{{ reason.explanation }}</div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                Confidence: {{ (reason.confidence * 100)|round(0) }}%
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% if result.reviewed_by %}
+                <div class="mt-2 text-sm text-gray-600">
+                    Reviewed by {{ result.reviewed_by }}
+                    {% if result.human_notes %}
+                    <span class="text-gray-400">— {{ result.human_notes }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if total_pages > 1 %}
+<div class="p-6 border-t border-gray-200 flex items-center justify-between">
+    <div class="text-sm text-gray-500">
+        Page {{ page }} of {{ total_pages }}
+    </div>
+    <div class="flex space-x-2">
+        {% if page > 1 %}
+        <button
+            hx-get="/api/screening/{{ screening_dir }}/results?page={{ page - 1 }}{% if filter_decision %}&filter_decision={{ filter_decision }}{% endif %}"
+            hx-target="#results-container"
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium"
+        >
+            Previous
+        </button>
+        {% endif %}
+        {% if page < total_pages %}
+        <button
+            hx-get="/api/screening/{{ screening_dir }}/results?page={{ page + 1 }}{% if filter_decision %}&filter_decision={{ filter_decision }}{% endif %}"
+            hx-target="#results-container"
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium"
+        >
+            Next
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

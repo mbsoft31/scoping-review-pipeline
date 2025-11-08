@@ -1,0 +1,18 @@
+{% if job %}
+<div class="p-4 bg-gray-100 rounded">
+    <p class="font-medium text-gray-700 mb-2">Job status: {{ job.status }}</p>
+    {% if job.status == 'running' %}
+    <div class="h-2 bg-gray-300 rounded-full overflow-hidden">
+        <div class="h-full bg-blue-500 transition-all" style="width: {{ (job.progress or 0) | int }}px"></div>
+    </div>
+    <p class="text-sm text-gray-500 mt-2">Progress: {{ job.progress }} papers{{ ' (db: ' ~ job.current_db ~ ')' if job.current_db is defined else '' }}</p>
+    {% elif job.status == 'completed' %}
+    <p class="text-green-600">Completed at {{ job.completed_at }}</p>
+    <p class="text-sm text-gray-500">Total: {{ job.total }} papers</p>
+    {% elif job.status == 'failed' %}
+    <p class="text-red-600">Failed: {{ job.error }}</p>
+    {% endif %}
+</div>
+{% else %}
+<div class="text-red-500">No job information available</div>
+{% endif %}

@@ -1,0 +1,1 @@
+"""Concrete search adapters for each supported source."""
