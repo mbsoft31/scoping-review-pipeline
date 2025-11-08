@@ -1,0 +1,31 @@
+{
+  "name": "srp-react-demo",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Demo React application showcasing TanStack Query, Table and Router with Shadcn UI and Tailwind CSS.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@tanstack/react-query": "^5.28.0",
+    "@tanstack/react-table": "^8.8.3",
+    "@tanstack/react-router": "^1.0.0-alpha.39",
+    "@tanstack/react-router-devtools": "^1.0.0-alpha.39",
+    "@radix-ui/react-table": "^1.0.0",
+    "clsx": "^1.2.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.2.0",
+    "vite": "^5.0.0"
+  }
+}

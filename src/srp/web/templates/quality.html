@@ -63,38 +63,5 @@
     </div>
 </div>
 
-<script>
-function qualityApp() {
-    return {
-        config: { tool: 'rob2' },
-        phaseDir: '',
-        loading: false,
-        jobId: null,
-        async startAssessment() {
-            this.loading = true;
-            try {
-                const payload = {
-                    phase_dir: this.phaseDir,
-                    tool: this.config.tool,
-                };
-                const resp = await fetch('/api/quality/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const data = await resp.json();
-                this.jobId = data.job_id;
-                // Trigger HTMX process
-                if (window.htmx) {
-                    window.htmx.process(document.body);
-                }
-            } catch (err) {
-                alert('Quality assessment failed: ' + err.message);
-            } finally {
-                this.loading = false;
-            }
-        },
-    };
-}
-</script>
+{# Component logic moved to a TypeScript module loaded via Vite. #}
 {% endblock %}

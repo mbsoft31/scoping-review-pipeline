@@ -1,0 +1,57 @@
+# Optional ML/NLP Dependencies
+# These require additional setup on Windows
+
+# =============================================================================
+# INSTALLATION INSTRUCTIONS FOR WINDOWS
+# =============================================================================
+#
+# Option 1: Use precompiled wheels (RECOMMENDED)
+# -----------------------------------------------
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# pip install sentence-transformers
+# pip install transformers
+#
+# Option 2: Use conda (ALTERNATIVE)
+# ----------------------------------
+# conda install -c pytorch pytorch
+# conda install -c conda-forge sentence-transformers transformers
+#
+# =============================================================================
+
+# Core ML libraries (use precompiled wheels)
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
+sentence-transformers>=2.3.0
+transformers>=4.36.0
+
+# Fine-tuning and optimization (use carefully on Windows)
+# peft>=0.7.0
+# accelerate>=0.25.0
+
+# =============================================================================
+# ADVANCED DEPENDENCIES (NOT RECOMMENDED FOR WINDOWS)
+# =============================================================================
+#
+# The following packages require C++ compilation and often fail on Windows:
+#
+# llama-cpp-python>=0.2.0
+#   - Requires: CMake, Visual Studio Build Tools, CUDA (optional)
+#   - Install: pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+#
+# spacy>=3.7.0
+#   - Requires: Visual Studio Build Tools
+#   - Alternative: pip install spacy-nightly (precompiled)
+#   - Download model: python -m spacy download en_core_web_sm
+#
+# scispacy>=0.5.3
+#   - Requires: spacy to be installed first
+#   - Install: pip install scispacy
+#   - Download model: pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_sm-0.5.3.tar.gz
+#
+# bitsandbytes>=0.41.0
+#   - NOT SUPPORTED ON WINDOWS (Linux/CUDA only)
+#   - Alternative: Use 8-bit inference on Linux or use cloud APIs
+#
+# =============================================================================
+

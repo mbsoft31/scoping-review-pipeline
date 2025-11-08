@@ -4,14 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Systematic Review Pipeline{% endblock %}</title>
-    <!-- Tailwind via CDN for rapid prototyping -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- HTMX for partial page updates -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <!-- Alpine.js for reactive components -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
-    <!-- Chart.js (loaded on demand) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+    {# Tailwind CSS is now bundled via Vite and imported in ``main.ts``.
+       The CDN script has been removed to avoid loading duplicate styles.  HTMX,
+       Alpine.js and Chart.js are also loaded via the Vite build. #}
     <style>
         [x-cloak] { display: none !important; }
     </style>
@@ -50,6 +45,14 @@
         </div>
     </footer>
     <!-- App-specific JS -->
-    <script src="/static/js/app.js"></script>
+    {#
+      Use an ES module compiled via the Vite/TypeScript build if available.
+      When the frontend has been built, ``/static/dist/main.js`` will be
+      generated and loaded as a module.  The ``nomodule`` script falls
+      back to the legacy JavaScript file for browsers that do not support
+      modules or when the build has not been run.
+    #}
+    <script type="module" src="/static/dist/main.js"></script>
+    {# The nomodule fallback has been removed now that Vite provides ES module bundles. #}
 </body>
 </html>

@@ -1,0 +1,63 @@
+# Development and Testing Dependencies (Windows-compatible)
+
+# ============================================================================
+# CORE TESTING FRAMEWORK (No compilation needed)
+# ============================================================================
+
+# Testing Framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+pytest-timeout>=2.2.0
+pytest-xdist>=3.5.0  # Parallel test execution
+
+# HTTP Mocking for API tests
+respx>=0.20.0
+
+# Test Data Generation
+faker>=20.0.0
+
+# Property-Based Testing
+hypothesis>=6.92.0
+
+# ============================================================================
+# CODE FORMATTING (Pure Python - works on Windows)
+# ============================================================================
+
+# Code Formatting
+black>=23.12.0
+isort>=5.13.0
+ruff>=0.1.9
+
+# ============================================================================
+# OPTIONAL: Type Checking & Advanced Tools
+# ============================================================================
+# These require Rust compiler (libcst) or C++ on Windows
+# Only install if you have build tools set up
+#
+# mypy>=1.7.0          # Requires libcst (Rust compiler) - skip on Windows
+# pylint>=3.0.0        # Heavy, slow on Windows
+#
+# Type Stubs (optional, only if using mypy)
+# types-PyYAML>=6.0.0
+# types-python-dateutil>=2.8.0
+
+# ============================================================================
+# DOCUMENTATION (Optional - uncomment if needed)
+# ============================================================================
+# mkdocs>=1.5.0
+# mkdocs-material>=9.5.0
+# mkdocstrings[python]>=0.24.0
+
+# ============================================================================
+# PERFORMANCE PROFILING (Optional - uncomment if needed)
+# ============================================================================
+# py-spy>=0.3.14           # Requires Rust compiler - skip on Windows
+# memory-profiler>=0.61.0
+
+# ============================================================================
+# MUTATION TESTING (Optional - advanced users only)
+# ============================================================================
+# mutmut>=2.4.0
+

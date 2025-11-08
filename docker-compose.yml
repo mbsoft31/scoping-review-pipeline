@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Backend API (FastAPI)
   srp-web:
     build: .
     container_name: srp-web
@@ -19,6 +20,7 @@ services:
     networks:
       - srp-network
 
+  # Background worker (unchanged)
   srp-worker:
     build: .
     container_name: srp-worker
@@ -32,6 +34,25 @@ services:
       - OUTPUT_DIR=/app/output
       - CACHE_DIR=/cache
       - LOG_LEVEL=INFO
+    depends_on:
+      - srp-web
+    restart: unless-stopped
+    networks:
+      - srp-network
+
+  # New frontend service running the React/Vite app
+  srp-frontend:
+    image: node:18-alpine
+    container_name: srp-frontend
+    working_dir: /frontend
+    volumes:
+      - ./react-app:/frontend
+    # Install dependencies on startup and run Vite in dev mode
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
     depends_on:
       - srp-web
     restart: unless-stopped

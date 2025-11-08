@@ -1,0 +1,9 @@
+/*
+ * Import Tailwind's layers for the React demo app.  The CSS is
+ * compiled during the Vite build.  You can add your own global
+ * styles here as needed.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

@@ -1,3 +1,4 @@
+# Core dependencies (Python 3.11+)
 python-dotenv>=1.0.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
@@ -11,7 +12,7 @@ tenacity>=8.2.0
 # Data processing
 pandas>=2.1.0
 pyarrow>=14.0.0
-numpy>=1.26.0
+numpy>=1.26.0,<2.0.0
 scikit-learn>=1.3.0
 networkx>=3.2.0
 
@@ -37,28 +38,41 @@ python-multipart>=0.0.6
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
 
-# Screening and semantic matching
-sentence-transformers>=2.3.0
-torch>=2.1.0
-
-# Additional dependencies for extraction, meta‑analysis, scheduling and notifications
+# PDF processing (lightweight)
 pdfplumber>=0.10.0
 PyMuPDF>=1.23.0
-spacy>=3.7.0
-transformers>=4.36.0
+
+# Stats and visualization
 scipy>=1.12.0
 statsmodels>=0.14.0
 matplotlib>=3.8.0
+
+# Scheduling
 schedule>=1.2.0
 APScheduler>=3.10.0
+
+# Notifications
 sendgrid>=6.11.0
 
-# LLM integration extras
-llama-cpp-python>=0.2.0
-peft>=0.7.0
-accelerate>=0.25.0
-bitsandbytes>=0.41.0
-scispacy>=0.5.3
+# LLM APIs (cloud-based, no compilation needed)
 openai>=1.6.0
 anthropic>=0.8.0
 groq>=0.4.0
+
+# ML/NLP (install only if needed - these work better with precompiled wheels)
+# Uncomment if you need these features:
+# sentence-transformers>=2.3.0
+# transformers>=4.36.0
+# torch>=2.1.0
+
+# Advanced features (OPTIONAL - require C++ compilation on Windows)
+# These are commented out because they fail to build on Windows without proper toolchain
+# Only uncomment if you have Visual Studio Build Tools installed
+#
+# llama-cpp-python>=0.2.0  # Requires CMake + C++ compiler
+# peft>=0.7.0              # Fine-tuning support
+# accelerate>=0.25.0       # Distributed training
+# bitsandbytes>=0.41.0     # Quantization (Linux/CUDA only, won't work on Windows)
+# scispacy>=0.5.3          # Requires spacy build
+# spacy>=3.7.0             # Requires C++ compilation
+

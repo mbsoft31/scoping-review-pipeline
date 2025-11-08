@@ -52,9 +52,13 @@ class QueryBuilder:
         queries: List[str] = []
         for core in core_queries:
             queries.append(core)
+            # Skip augmentation if no terms provided
+            if not augmentation_terms:
+                continue
             for aug_combo in combinations(augmentation_terms, min(max_augmentations, len(augmentation_terms))):
-                augmented = f"{core} {' '.join(aug_combo)}"
-                queries.append(augmented)
+                if aug_combo:  # Only add if there are actual augmentation terms
+                    augmented = f"{core} {' '.join(aug_combo)}"
+                    queries.append(augmented)
         return queries
 
     def optimize_for_source(self, query: str, source: str) -> str:

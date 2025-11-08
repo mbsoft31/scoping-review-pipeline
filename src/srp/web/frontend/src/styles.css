@@ -1,0 +1,12 @@
+/*
+ * Global styles for the SRP web frontend.
+ *
+ * This file imports the base, component, and utility layers from Tailwind
+ * CSS. When compiled by PostCSS during the Vite build, Tailwind will
+ * generate the appropriate styles based on the classes referenced in
+ * your templates and TypeScript files.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

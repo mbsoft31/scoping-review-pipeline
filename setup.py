@@ -1,0 +1,55 @@
+"""Setup configuration for systematic-review-pipeline."""
+
+from setuptools import setup, find_packages
+
+setup(
+    name="systematic-review-pipeline",
+    version="0.1.0",
+    description="Modular pipeline for systematic literature reviews",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    python_requires=">=3.11",
+    install_requires=[
+        "python-dotenv>=1.0.0",
+        "pydantic>=2.5.0",
+        "pydantic-settings>=2.1.0",
+        "httpx>=0.25.0",
+        "aiofiles>=23.2.0",
+        "aiolimiter>=1.1.0",
+        "tenacity>=8.2.0",
+        "pandas>=2.1.0",
+        "pyarrow>=14.0.0",
+        "numpy>=1.26.0,<2.0.0",
+        "scikit-learn>=1.3.0",
+        "networkx>=3.2.0",
+        "rapidfuzz>=3.5.0",
+        "typer[all]>=0.9.0",
+        "rich>=13.7.0",
+        "tqdm>=4.66.0",
+        "python-dateutil>=2.8.0",
+        "pyyaml>=6.0.1",
+        "fastapi>=0.110.0",
+        "uvicorn[standard]>=0.23.0",
+        "jinja2>=3.1.2",
+        "python-multipart>=0.0.6",
+        "pytest>=7.4.0",
+        "pytest-asyncio>=0.21.0",
+        "pdfplumber>=0.10.0",
+        "PyMuPDF>=1.23.0",
+        "scipy>=1.12.0",
+        "statsmodels>=0.14.0",
+        "matplotlib>=3.8.0",
+        "schedule>=1.2.0",
+        "APScheduler>=3.10.0",
+        "sendgrid>=6.11.0",
+        "openai>=1.6.0",
+        "anthropic>=0.8.0",
+        "groq>=0.4.0",
+    ],
+    entry_points={
+        "console_scripts": [
+            "srp=srp.cli.main:app",
+        ],
+    },
+)
+
