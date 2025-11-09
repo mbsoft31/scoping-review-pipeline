@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 
 class TaskStatus(Enum):
     """Task execution states."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -29,41 +30,41 @@ class TaskStatus(Enum):
 @dataclass
 class SearchTask:
     """A single search task with all necessary metadata."""
-    
+
     # Identity
     task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    
+
     # Search parameters
     source: str = ""
     query: str = ""
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     limit: Optional[int] = None
-    
+
     # Configuration
     config: Dict[str, Any] = field(default_factory=dict)
     priority: int = 0  # Lower = higher priority
-    
+
     # State
     status: TaskStatus = TaskStatus.PENDING
     created_at: datetime = field(default_factory=datetime.now)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    
+
     # Results
     papers: List[Paper] = field(default_factory=list)
     error: Optional[str] = None
-    
+
     # Progress tracking
     pages_fetched: int = 0
     papers_fetched: int = 0
     retry_count: int = 0
     max_retries: int = 3
-    
+
     # Cache
     cache_query_id: Optional[str] = None
     resume_from_cache: bool = True
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dict for persistence."""
         return {
@@ -86,7 +87,7 @@ class SearchTask:
             "max_retries": self.max_retries,
             "cache_query_id": self.cache_query_id,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SearchTask":
         """Deserialize from dict."""
@@ -94,8 +95,12 @@ class SearchTask:
             task_id=data["task_id"],
             source=data["source"],
             query=data["query"],
-            start_date=date.fromisoformat(data["start_date"]) if data.get("start_date") else None,
-            end_date=date.fromisoformat(data["end_date"]) if data.get("end_date") else None,
+            start_date=date.fromisoformat(data["start_date"])
+            if data.get("start_date")
+            else None,
+            end_date=date.fromisoformat(data["end_date"])
+            if data.get("end_date")
+            else None,
             limit=data.get("limit"),
             config=data.get("config", {}),
             priority=data.get("priority", 0),
@@ -104,6 +109,7 @@ class SearchTask:
             max_retries=data.get("max_retries", 3),
             cache_query_id=data.get("cache_query_id"),
         )
+        # Parse timestamps
         task.created_at = datetime.fromisoformat(data["created_at"])
         if data.get("started_at"):
             task.started_at = datetime.fromisoformat(data["started_at"])
@@ -116,186 +122,210 @@ class SearchTask:
 
 
 class TaskQueue:
-    """Priority queue for search tasks with persistence."""
-    
-    def __init__(self, state_file: Optional[Path] = None, max_size: int = 100, max_retries: int = 3):
+    """
+    Priority queue for search tasks with persistence.
+
+    Features:
+    - Priority-based execution
+    - Task persistence (survive crashes)
+    - Automatic retry logic
+    - Cache integration
+    - Progress tracking
+    """
+
+    def __init__(self, state_file: Optional[Path] = None):
         self.state_file = state_file or Path(".cache/task_queue_state.json")
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        self.max_size = max_size
-        self.default_max_retries = max_retries
-        
+
+        # Task storage
         self.tasks: Dict[str, SearchTask] = {}
-        self.pending_queue: deque[str] = deque()
+        self.pending_queue: deque[str] = deque()  # task_ids
         self.running_tasks: Dict[str, SearchTask] = {}
-        
+
+        # Load persisted state
         self._load_state()
+
+        # Synchronization
         self._lock = asyncio.Lock()
         self._not_empty = asyncio.Condition(self._lock)
-    
+
     async def enqueue(self, task: SearchTask) -> str:
-        """Add task to queue."""
+        """
+        Add task to queue.
+
+        Returns:
+            task_id for tracking
+        """
         async with self._lock:
-            if len(self.tasks) >= self.max_size:
-                raise ValueError(f"Queue full (max {self.max_size} tasks)")
-            
-            if not task.max_retries:
-                task.max_retries = self.default_max_retries
-            
             self.tasks[task.task_id] = task
             self.pending_queue.append(task.task_id)
-            
+
+            # Sort queue by priority (lower priority = higher in queue)
             self.pending_queue = deque(
                 sorted(self.pending_queue, key=lambda tid: self.tasks[tid].priority)
             )
-            
+
             logger.info(
                 f"Enqueued task {task.task_id[:8]}: "
                 f"{task.source} query='{task.query[:50]}...' priority={task.priority}"
             )
-            
+
             self._save_state()
             self._not_empty.notify()
-            
+
             return task.task_id
-    
+
     async def dequeue(self, timeout: Optional[float] = None) -> Optional[SearchTask]:
-        """Get next task from queue (blocks if empty)."""
+        """
+        Get next task from queue (blocks if empty).
+
+        Args:
+            timeout: Max seconds to wait, None = wait forever
+
+        Returns:
+            Task or None if timeout
+        """
         async with self._not_empty:
             while not self.pending_queue:
                 try:
                     await asyncio.wait_for(self._not_empty.wait(), timeout=timeout)
                 except asyncio.TimeoutError:
                     return None
-            
+
             task_id = self.pending_queue.popleft()
             task = self.tasks[task_id]
-            
+
+            # Move to running
             task.status = TaskStatus.RUNNING
             task.started_at = datetime.now()
             self.running_tasks[task_id] = task
-            
+
             logger.debug(f"Dequeued task {task_id[:8]}")
             self._save_state()
-            
+
             return task
-    
-    async def complete_task(self, task_id: str, papers: List[Paper], from_cache: bool = False):
+
+    async def complete_task(
+        self, task_id: str, papers: List[Paper], from_cache: bool = False
+    ):
         """Mark task as completed."""
         async with self._lock:
             if task_id not in self.tasks:
                 logger.warning(f"Task {task_id[:8]} not found")
                 return
-            
+
             task = self.tasks[task_id]
             task.status = TaskStatus.CACHED if from_cache else TaskStatus.COMPLETED
             task.completed_at = datetime.now()
             task.papers = papers
             task.papers_fetched = len(papers)
-            
+
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
-            
+
             logger.info(
                 f"Task {task_id[:8]} completed: "
                 f"{len(papers)} papers ({task.status.value})"
             )
-            
+
             self._save_state()
-    
+
     async def fail_task(self, task_id: str, error: str):
         """Mark task as failed (will retry if retries remaining)."""
         async with self._lock:
             if task_id not in self.tasks:
                 return
-            
+
             task = self.tasks[task_id]
             task.retry_count += 1
-            
+
             if task.retry_count < task.max_retries:
+                # Re-queue for retry
                 logger.warning(
                     f"Task {task_id[:8]} failed (retry {task.retry_count}/{task.max_retries}): {error}"
                 )
                 task.status = TaskStatus.PENDING
                 task.error = error
                 self.pending_queue.append(task_id)
+
+                # Lower priority for failed tasks
                 task.priority += 10
             else:
+                # Max retries exceeded
                 logger.error(
                     f"Task {task_id[:8]} failed permanently after "
                     f"{task.retry_count} retries: {error}"
                 )
                 task.status = TaskStatus.FAILED
                 task.error = error
-            
+
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
-            
+
             self._save_state()
-    
+
     async def cancel_task(self, task_id: str):
         """Cancel a task."""
         async with self._lock:
             if task_id not in self.tasks:
                 return
-            
+
             task = self.tasks[task_id]
             task.status = TaskStatus.CANCELLED
-            
+
+            # Remove from queues
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
-            try:
+            if task_id in self.pending_queue:
                 self.pending_queue.remove(task_id)
-            except ValueError:
-                pass
-            
+
             logger.info(f"Task {task_id[:8]} cancelled")
             self._save_state()
-    
+
     def get_task(self, task_id: str) -> Optional[SearchTask]:
         """Get task by ID."""
         return self.tasks.get(task_id)
-    
+
     def get_all_tasks(self) -> List[SearchTask]:
         """Get all tasks."""
         return list(self.tasks.values())
-    
+
     def get_tasks_by_status(self, status: TaskStatus) -> List[SearchTask]:
         """Get tasks with specific status."""
         return [t for t in self.tasks.values() if t.status == status]
-    
+
     async def size(self) -> int:
         """Number of pending tasks."""
         async with self._lock:
             return len(self.pending_queue)
-    
+
     def _save_state(self):
         """Persist queue state to disk."""
-        try:
-            state = {
-                "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},
-                "pending_queue": list(self.pending_queue),
-                "saved_at": datetime.now().isoformat(),
-            }
-            self.state_file.write_text(json.dumps(state, indent=2))
-        except Exception as e:
-            logger.error(f"Failed to save queue state: {e}")
-    
+        state = {
+            "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},
+            "pending_queue": list(self.pending_queue),
+            "saved_at": datetime.now().isoformat(),
+        }
+        self.state_file.write_text(json.dumps(state, indent=2))
+
     def _load_state(self):
         """Load queue state from disk."""
         if not self.state_file.exists():
             return
-        
+
         try:
             state = json.loads(self.state_file.read_text())
-            
+
+            # Restore tasks
             for task_id, task_data in state["tasks"].items():
                 task = SearchTask.from_dict(task_data)
                 self.tasks[task_id] = task
-                
+
+                # Re-queue pending/running tasks
                 if task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
-                    task.status = TaskStatus.PENDING
+                    task.status = TaskStatus.PENDING  # Reset running to pending
                     self.pending_queue.append(task_id)
-            
+
             logger.info(
                 f"Restored {len(self.tasks)} tasks from state "
                 f"({len(self.pending_queue)} pending)"
