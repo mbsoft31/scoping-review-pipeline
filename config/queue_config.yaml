@@ -1,0 +1,44 @@
+# Queue System Configuration
+# ===========================
+
+queue:
+  # Worker pool settings
+  num_workers: 3  # Safe default for most APIs
+  worker_timeout: 300  # 5 minutes max per task
+  
+  # Retry settings
+  max_retries: 3
+  retry_backoff_factor: 2.0
+  retry_max_wait: 60.0
+  
+  # Cache settings
+  enable_cache: true
+  cache_dir: ".cache/searches"
+  cache_ttl: 86400  # 24 hours
+  
+  # Progress settings
+  progress_interval: 2.0  # Update every 2 seconds
+  show_detailed_progress: false  # Per-task progress bars (can be noisy)
+  
+  # Safety limits
+  max_queue_size: 100  # Prevent memory issues
+  max_papers_per_task: 10000  # Safety limit
+
+# Database-specific settings
+# Each database can have different concurrency and timeout settings
+databases:
+  openalex:
+    max_concurrent: 2  # Max concurrent OpenAlex tasks
+    timeout: 30.0
+    
+  semantic_scholar:
+    max_concurrent: 1  # S2 is sensitive to rate limits
+    timeout: 45.0
+    
+  arxiv:
+    max_concurrent: 1  # arXiv polite usage (1 req per 3 seconds)
+    timeout: 60.0
+    
+  crossref:
+    max_concurrent: 3  # Crossref polite pool is generous
+    timeout: 30.0
