@@ -5,6 +5,7 @@ from typing import Optional
 from pathlib import Path
 
 from .task_queue import TaskQueue, SearchTask, TaskStatus
+from .error_handler import ErrorHandler, ErrorType
 from ..search.orchestrator import SearchOrchestrator
 from ..io.cache import SearchCache
 from ..utils.logging import get_logger
@@ -18,13 +19,14 @@ class Worker:
     
     Workers run in an async loop, continuously fetching and executing
     tasks until stopped. Each worker operates independently and handles
-    its own error recovery.
+    its own error recovery with intelligent retry logic.
     
     Attributes:
         worker_id: Unique worker identifier
         queue: Task queue to pull from
         orchestrator: Search orchestrator for executing searches
         cache: Cache for result persistence
+        error_handler: Intelligent error handler with circuit breakers
         current_task: Currently executing task
     """
     
@@ -48,6 +50,7 @@ class Worker:
         self.queue = queue
         self.orchestrator = orchestrator
         self.cache = cache
+        self.error_handler = ErrorHandler()
         self.current_task: Optional[SearchTask] = None
         self._stop_event = asyncio.Event()
     
@@ -82,7 +85,14 @@ class Worker:
     
     async def _execute_task(self, task: SearchTask):
         """
-        Execute a single search task.
+        Execute a single search task with intelligent retry logic.
+        
+        This method implements:
+        - Cache checking
+        - Circuit breaker protection
+        - Error classification
+        - Adaptive backoff
+        - Retry decision logic
         
         Args:
             task: Task to execute
@@ -92,9 +102,9 @@ class Worker:
             f"{task.source} query='{task.query[:50]}...'"
         )
         
-        try:
-            # Check cache first
-            if task.resume_from_cache and task.cache_query_id:
+        # Check cache first
+        if task.resume_from_cache and task.cache_query_id:
+            try:
                 progress = self.cache.get_query_progress(task.cache_query_id)
                 if progress and progress["completed"]:
                     logger.info(
@@ -108,30 +118,76 @@ class Worker:
                         from_cache=True
                     )
                     return
+            except Exception as e:
+                logger.warning(f"Cache check failed: {e}, proceeding with search")
+        
+        # Execute with retry logic
+        max_attempts = 5
+        attempt = 0
+        
+        while attempt < max_attempts:
+            attempt += 1
             
-            # Execute search
-            papers = await self.orchestrator.search_source(
-                source=task.source,
-                query=task.query,
-                start_date=task.start_date,
-                end_date=task.end_date,
-                limit=task.limit,
-                config=task.config,
-                resume=task.resume_from_cache,
-            )
-            
-            # Update progress
-            task.papers_fetched = len(papers)
-            
-            # Complete task
-            await self.queue.complete_task(task.task_id, papers)
-            
-        except Exception as e:
-            logger.error(
-                f"Task {task.task_id[:8]} failed: {e}",
-                exc_info=True
-            )
-            await self.queue.fail_task(task.task_id, str(e))
+            try:
+                # Get circuit breaker for this source
+                circuit = self.error_handler.get_circuit_breaker(task.source)
+                
+                # Execute search with circuit breaker protection
+                papers = await circuit.call(
+                    self.orchestrator.search_source,
+                    source=task.source,
+                    query=task.query,
+                    start_date=task.start_date,
+                    end_date=task.end_date,
+                    limit=task.limit,
+                    config=task.config,
+                    resume=task.resume_from_cache,
+                )
+                
+                # Success!
+                task.papers_fetched = len(papers)
+                await self.queue.complete_task(task.task_id, papers)
+                
+                logger.info(
+                    f"Task {task.task_id[:8]} completed successfully "
+                    f"({len(papers)} papers, {attempt} attempt(s))"
+                )
+                return
+                
+            except Exception as e:
+                # Classify error
+                error_type = self.error_handler.classify_error(e)
+                
+                logger.warning(
+                    f"Task {task.task_id[:8]} attempt {attempt}/{max_attempts} failed: "
+                    f"{error_type.value} - {str(e)[:100]}"
+                )
+                
+                # Check if should retry
+                should_retry = self.error_handler.should_retry(
+                    error_type, attempt, max_attempts
+                )
+                
+                if not should_retry:
+                    # Permanent failure
+                    logger.error(
+                        f"Task {task.task_id[:8]} failed permanently after "
+                        f"{attempt} attempts ({error_type.value})"
+                    )
+                    await self.queue.fail_task(task.task_id, str(e))
+                    return
+                
+                # Calculate backoff
+                backoff = await self.error_handler.calculate_backoff(
+                    error_type, attempt
+                )
+                
+                logger.info(
+                    f"Retrying task {task.task_id[:8]} in {backoff:.1f}s "
+                    f"(attempt {attempt + 1}/{max_attempts})"
+                )
+                
+                await asyncio.sleep(backoff)
     
     def stop(self):
         """Signal worker to stop."""
@@ -151,6 +207,7 @@ class WorkerPool:
     - Graceful shutdown with timeout
     - Worker health monitoring
     - Automatic cleanup
+    - Shared error handler across workers
     
     Example:
         >>> pool = WorkerPool(queue, orchestrator, cache, num_workers=3)
