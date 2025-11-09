@@ -175,8 +175,8 @@ async def get_job_status(job_id: str) -> Dict[str, object]:
     return active_jobs[job_id]
 
 
-@router.get("/api/jobs/{job_id}/progress", response_class=HTMLResponse)
-async def get_job_progress_html(request: Request, job_id: str) -> HTMLResponse | str:
+@router.get("/api/jobs/{job_id}/progress", response_class=HTMLResponse, response_model=None)
+async def get_job_progress_html(request: Request, job_id: str):
     """Return an HTMX snippet representing job progress."""
     if job_id not in active_jobs:
         return "<div class='text-red-500'>Job not found</div>"
@@ -211,13 +211,13 @@ async def results_page(request: Request) -> HTMLResponse:
     )
 
 
-@router.get("/api/results/{phase_dir:path}/papers", response_class=HTMLResponse)
+@router.get("/api/results/{phase_dir:path}/papers", response_class=HTMLResponse, response_model=None)
 async def get_papers_html(
     request: Request,
     phase_dir: str,
     page: int = 1,
     per_page: int = 20,
-) -> HTMLResponse | str:
+):
     """Return a page of papers as an HTMX component."""
     dir_path = Path(phase_dir)
     if not dir_path.exists():
@@ -1185,14 +1185,14 @@ async def api_review_stats(screening_dir: str) -> Dict[str, object]:
     return reviewer.get_statistics()
 
 
-@router.get("/api/screening/{screening_dir:path}/results", response_class=HTMLResponse)
+@router.get("/api/screening/{screening_dir:path}/results", response_class=HTMLResponse, response_model=None)
 async def api_screening_results_html(
     request: Request,
     screening_dir: str,
     filter_decision: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
-) -> HTMLResponse | str:
+):
     """Return an HTML snippet containing screening results for a session."""
     dir_path = Path(screening_dir)
     results_file = dir_path / "screening_results.parquet"

@@ -9,6 +9,8 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 
+from srp.core.models import Paper
+from srp.io.validation import validate_phase_output
 from ..config.settings import settings
 from ..search.orchestrator import SearchOrchestrator
 from ..search.query_builder import QueryBuilder, load_domain_terms
@@ -244,7 +246,7 @@ def phase2(
         raise typer.Exit(1)
     console.print(f"[cyan]Loading papers from {parquet_path}...[/cyan]")
     import pandas as pd
-    from ..core.models import Paper, Source
+    from ..core.models import Source
     df = pd.read_parquet(parquet_path)
     papers: List[Paper] = []
     for _, row in df.iterrows():
@@ -358,7 +360,7 @@ async def _run_phase2(
         )
     console.print(table)
     # Save graph stats
-    G = scorer._build_citation_graph(deduped_papers, resolved_refs)
+    G = scorer.build_citation_graph(deduped_papers, resolved_refs)
     graph_stats = scorer.get_graph_statistics(G)
     stats = {
         "deduplication": {

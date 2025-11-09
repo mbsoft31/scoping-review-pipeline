@@ -50,9 +50,9 @@ async def test_complete_phase1_workflow(temp_output_dir):
     # Ensure we retrieved some papers and they have IDs
     assert len(papers) > 0, "Should retrieve papers"
     assert all(p.paper_id for p in papers), "All papers should have IDs"
-    # Save to parquet
+    # Save to parquet with naming convention expected by validator
     df = pd.DataFrame([p.model_dump(mode="json", exclude={"raw_data"}) for p in papers])
-    output_file = temp_output_dir / "01_search_results.parquet"
+    output_file = temp_output_dir / "search_papers.parquet"
     df.to_parquet(output_file, index=False)
     assert output_file.exists(), "Output file should be created"
     # Validate the phase output using the validator

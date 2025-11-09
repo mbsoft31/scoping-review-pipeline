@@ -43,7 +43,7 @@ class SemanticScholarClient(SearchClient):
     def _build_headers(self) -> Dict[str, str]:
         headers = {"User-Agent": "SystematicReviewPipeline/0.1.0"}
         if self.api_key:
-            # Preserve header name as configured (may include quotes)
+            # Strip any quotes from the API key value
             key_value = self.api_key.strip("'\"")
             headers["x-api-key"] = key_value
         return headers

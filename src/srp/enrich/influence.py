@@ -77,7 +77,7 @@ class InfluenceScorer:
             self.weight_log_citations,
         )
 
-    def _build_citation_graph(self, papers: List[Paper], references: List[Reference]) -> nx.DiGraph:
+    def build_citation_graph(self, papers: List[Paper], references: List[Reference]) -> nx.DiGraph:
         """Construct a directed citation graph from papers and resolved references.
 
         Nodes correspond to paper IDs. Directed edges go from the citing paper to
@@ -168,7 +168,7 @@ class InfluenceScorer:
                 pagerank, betweenness, influence_score, rank.
         """
         logger.info("Building citation graph for influence scoring")
-        G = self._build_citation_graph(papers, references)
+        G = self.build_citation_graph(papers, references)
         # Compute PageRank, in-degree and betweenness. If networkx is unavailable,
         # use simple fallbacks.
         if nx is None:  # pragma: no cover
