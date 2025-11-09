@@ -28,26 +28,7 @@ class TaskStatus(Enum):
 
 @dataclass
 class SearchTask:
-    """
-    A single search task with all necessary metadata.
-    
-    Attributes:
-        task_id: Unique identifier
-        source: Database name (openalex, arxiv, etc.)
-        query: Search query string
-        start_date: Filter papers from this date
-        end_date: Filter papers until this date
-        limit: Maximum papers to fetch
-        config: Source-specific configuration
-        priority: Execution priority (lower = higher priority)
-        status: Current task status
-        papers: Collected papers
-        error: Error message if failed
-        retry_count: Number of retry attempts
-        max_retries: Maximum retry attempts
-        cache_query_id: Associated cache query ID
-        resume_from_cache: Whether to resume from cache
-    """
+    """A single search task with all necessary metadata."""
     
     # Identity
     task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -123,7 +104,6 @@ class SearchTask:
             max_retries=data.get("max_retries", 3),
             cache_query_id=data.get("cache_query_id"),
         )
-        # Parse timestamps
         task.created_at = datetime.fromisoformat(data["created_at"])
         if data.get("started_at"):
             task.started_at = datetime.fromisoformat(data["started_at"])
@@ -136,69 +116,36 @@ class SearchTask:
 
 
 class TaskQueue:
-    """
-    Priority queue for search tasks with persistence.
+    """Priority queue for search tasks with persistence."""
     
-    Features:
-    - Priority-based execution (lower priority number = higher priority)
-    - Task persistence (survives crashes/restarts)
-    - Automatic retry logic with exponential backoff
-    - Cache integration for resumable searches
-    - Thread-safe async operations
-    
-    Example:
-        >>> queue = TaskQueue()
-        >>> task = SearchTask(source="openalex", query="ML", priority=1)
-        >>> task_id = await queue.enqueue(task)
-        >>> task = await queue.dequeue()
-        >>> # ... execute task ...
-        >>> await queue.complete_task(task_id, papers)
-    """
-    
-    def __init__(self, state_file: Optional[Path] = None):
-        """
-        Initialize task queue.
-        
-        Args:
-            state_file: Path to state persistence file (default: .cache/task_queue_state.json)
-        """
+    def __init__(self, state_file: Optional[Path] = None, max_size: int = 100, max_retries: int = 3):
         self.state_file = state_file or Path(".cache/task_queue_state.json")
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        self.max_size = max_size
+        self.default_max_retries = max_retries
         
-        # Task storage
         self.tasks: Dict[str, SearchTask] = {}
-        self.pending_queue: deque[str] = deque()  # task_ids
+        self.pending_queue: deque[str] = deque()
         self.running_tasks: Dict[str, SearchTask] = {}
         
-        # Load persisted state
         self._load_state()
-        
-        # Synchronization
         self._lock = asyncio.Lock()
         self._not_empty = asyncio.Condition(self._lock)
     
     async def enqueue(self, task: SearchTask) -> str:
-        """
-        Add task to queue.
-        
-        Tasks are sorted by priority (lower priority number = executes first).
-        
-        Args:
-            task: SearchTask to enqueue
-            
-        Returns:
-            task_id for tracking
-        """
+        """Add task to queue."""
         async with self._lock:
+            if len(self.tasks) >= self.max_size:
+                raise ValueError(f"Queue full (max {self.max_size} tasks)")
+            
+            if not task.max_retries:
+                task.max_retries = self.default_max_retries
+            
             self.tasks[task.task_id] = task
             self.pending_queue.append(task.task_id)
             
-            # Sort queue by priority (lower priority = higher in queue)
             self.pending_queue = deque(
-                sorted(
-                    self.pending_queue,
-                    key=lambda tid: self.tasks[tid].priority
-                )
+                sorted(self.pending_queue, key=lambda tid: self.tasks[tid].priority)
             )
             
             logger.info(
@@ -212,29 +159,17 @@ class TaskQueue:
             return task.task_id
     
     async def dequeue(self, timeout: Optional[float] = None) -> Optional[SearchTask]:
-        """
-        Get next task from queue (blocks if empty).
-        
-        Args:
-            timeout: Max seconds to wait, None = wait forever
-            
-        Returns:
-            Task or None if timeout
-        """
+        """Get next task from queue (blocks if empty)."""
         async with self._not_empty:
             while not self.pending_queue:
                 try:
-                    await asyncio.wait_for(
-                        self._not_empty.wait(),
-                        timeout=timeout
-                    )
+                    await asyncio.wait_for(self._not_empty.wait(), timeout=timeout)
                 except asyncio.TimeoutError:
                     return None
             
             task_id = self.pending_queue.popleft()
             task = self.tasks[task_id]
             
-            # Move to running
             task.status = TaskStatus.RUNNING
             task.started_at = datetime.now()
             self.running_tasks[task_id] = task
@@ -244,20 +179,8 @@ class TaskQueue:
             
             return task
     
-    async def complete_task(
-        self, 
-        task_id: str, 
-        papers: List[Paper],
-        from_cache: bool = False
-    ):
-        """
-        Mark task as completed.
-        
-        Args:
-            task_id: ID of completed task
-            papers: Collected papers
-            from_cache: Whether results came from cache
-        """
+    async def complete_task(self, task_id: str, papers: List[Paper], from_cache: bool = False):
+        """Mark task as completed."""
         async with self._lock:
             if task_id not in self.tasks:
                 logger.warning(f"Task {task_id[:8]} not found")
@@ -280,13 +203,7 @@ class TaskQueue:
             self._save_state()
     
     async def fail_task(self, task_id: str, error: str):
-        """
-        Mark task as failed (will retry if retries remaining).
-        
-        Args:
-            task_id: ID of failed task
-            error: Error message
-        """
+        """Mark task as failed (will retry if retries remaining)."""
         async with self._lock:
             if task_id not in self.tasks:
                 return
@@ -295,18 +212,14 @@ class TaskQueue:
             task.retry_count += 1
             
             if task.retry_count < task.max_retries:
-                # Re-queue for retry
                 logger.warning(
                     f"Task {task_id[:8]} failed (retry {task.retry_count}/{task.max_retries}): {error}"
                 )
                 task.status = TaskStatus.PENDING
                 task.error = error
                 self.pending_queue.append(task_id)
-                
-                # Lower priority for failed tasks (add penalty)
                 task.priority += 10
             else:
-                # Max retries exceeded
                 logger.error(
                     f"Task {task_id[:8]} failed permanently after "
                     f"{task.retry_count} retries: {error}"
@@ -320,12 +233,7 @@ class TaskQueue:
             self._save_state()
     
     async def cancel_task(self, task_id: str):
-        """
-        Cancel a task.
-        
-        Args:
-            task_id: ID of task to cancel
-        """
+        """Cancel a task."""
         async with self._lock:
             if task_id not in self.tasks:
                 return
@@ -333,11 +241,12 @@ class TaskQueue:
             task = self.tasks[task_id]
             task.status = TaskStatus.CANCELLED
             
-            # Remove from queues
             if task_id in self.running_tasks:
                 del self.running_tasks[task_id]
-            if task_id in self.pending_queue:
+            try:
                 self.pending_queue.remove(task_id)
+            except ValueError:
+                pass
             
             logger.info(f"Task {task_id[:8]} cancelled")
             self._save_state()
@@ -361,12 +270,15 @@ class TaskQueue:
     
     def _save_state(self):
         """Persist queue state to disk."""
-        state = {
-            "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},
-            "pending_queue": list(self.pending_queue),
-            "saved_at": datetime.now().isoformat(),
-        }
-        self.state_file.write_text(json.dumps(state, indent=2))
+        try:
+            state = {
+                "tasks": {tid: task.to_dict() for tid, task in self.tasks.items()},
+                "pending_queue": list(self.pending_queue),
+                "saved_at": datetime.now().isoformat(),
+            }
+            self.state_file.write_text(json.dumps(state, indent=2))
+        except Exception as e:
+            logger.error(f"Failed to save queue state: {e}")
     
     def _load_state(self):
         """Load queue state from disk."""
@@ -376,14 +288,12 @@ class TaskQueue:
         try:
             state = json.loads(self.state_file.read_text())
             
-            # Restore tasks
             for task_id, task_data in state["tasks"].items():
                 task = SearchTask.from_dict(task_data)
                 self.tasks[task_id] = task
                 
-                # Re-queue pending/running tasks
                 if task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
-                    task.status = TaskStatus.PENDING  # Reset running to pending
+                    task.status = TaskStatus.PENDING
                     self.pending_queue.append(task_id)
             
             logger.info(
