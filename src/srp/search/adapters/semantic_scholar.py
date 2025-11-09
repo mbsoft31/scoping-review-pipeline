@@ -1,4 +1,4 @@
-"""Semantic Scholar API adapter with offset pagination and special header handling."""
+"""Semantic Scholar API adapter with offset pagination and improved rate limiting."""
 
 import asyncio
 from datetime import date, datetime
@@ -12,6 +12,7 @@ from tenacity import (
 )
 
 from ...config.settings import settings
+from ...config.adapter_config import get_adapter_config
 from ...core.models import Paper, Author, Source
 from ...core.ids import generate_paper_id, normalize_doi, normalize_arxiv_id
 from ...core.normalization import parse_date, extract_year, clean_abstract
@@ -23,17 +24,30 @@ logger = get_logger(__name__)
 
 
 class SemanticScholarClient(SearchClient):
-    """Semantic Scholar API client with quirky header support and offset pagination."""
+    """Semantic Scholar API client with improved rate limiting and error handling."""
 
     BASE_URL = "https://api.semanticscholar.org/graph/v1"
 
     def __init__(self, config: Optional[dict] = None) -> None:
         super().__init__(config or {})
         self.api_key = settings.semantic_scholar_api_key
-        self.rate_limiter = RateLimiter(rate=settings.semantic_scholar_rate_limit, period=1.0)
-        self.per_page_delay = self.config.get("per_page_delay", 1.3)
+        
+        # Get default configuration for this adapter
+        adapter_cfg = get_adapter_config("semantic_scholar")
+        rate_cfg = adapter_cfg.rate_limit
+        
+        # Initialize rate limiter with burst support
+        self.rate_limiter = RateLimiter(
+            rate=rate_cfg.rate,
+            period=1.0,
+            burst=rate_cfg.burst
+        )
+        
+        # Note: per_page_delay removed - it was causing unnecessary slowdown
+        # The rate limiter with burst capacity handles pacing automatically
+        
         self.client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=rate_cfg.timeout,
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
             headers=self._build_headers(),
         )
@@ -43,9 +57,9 @@ class SemanticScholarClient(SearchClient):
     def _build_headers(self) -> Dict[str, str]:
         headers = {"User-Agent": "SystematicReviewPipeline/0.1.0"}
         if self.api_key:
-            # Strip any quotes from the API key value
-            key_value = self.api_key.strip("'\"")
-            headers["x-api-key"] = key_value
+            # Use API key directly - no quote stripping needed
+            # Environment variables are already strings
+            headers["x-api-key"] = self.api_key
         return headers
 
     def _build_query_params(
@@ -106,16 +120,34 @@ class SemanticScholarClient(SearchClient):
         params = self._build_query_params(query, start_date, end_date, offset, page_size)
         await self.rate_limiter.acquire()
         logger.debug("Fetching S2 page", extra={"query": query, "offset": offset, "page_size": page_size})
+        
         response = await self.client.get(f"{self.BASE_URL}/paper/search", params=params)
+        
+        # Improved 429 handling
         if response.status_code == 429:
-            retry_after = int(response.headers.get("Retry-After", 10))
-            logger.warning(f"Rate limited, waiting {retry_after}s")
+            # Get retry-after header (S2 usually provides this)
+            retry_after = int(response.headers.get("Retry-After", 30))
+            logger.warning(
+                f"Rate limited by S2, waiting {retry_after}s. "
+                f"Consider reducing concurrent requests or adding API key."
+            )
             await asyncio.sleep(retry_after)
-            raise httpx.HTTPStatusError("Rate limited", request=response.request, response=response)
+            
+            # Reset rate limiter tokens after backoff
+            # This prevents immediate re-triggering of rate limits
+            self.rate_limiter._tokens = float(self.rate_limiter.burst)
+            
+            raise httpx.HTTPStatusError(
+                "Rate limited", 
+                request=response.request, 
+                response=response
+            )
+        
         response.raise_for_status()
-        # Additional per-page delay to avoid S2 throttling
-        if self.per_page_delay > 0:
-            await asyncio.sleep(self.per_page_delay)
+        
+        # No per-page delay needed - rate limiter handles pacing
+        # Removed: await asyncio.sleep(self.per_page_delay)
+        
         return response.json()
 
     def _parse_author(self, author_data: Dict[str, Any]) -> Author:
