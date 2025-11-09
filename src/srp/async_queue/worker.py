@@ -13,20 +13,7 @@ logger = get_logger(__name__)
 
 
 class Worker:
-    """
-    Single worker that processes tasks from queue.
-    
-    Workers run in an async loop, continuously fetching and executing
-    tasks until stopped. Each worker operates independently and handles
-    its own error recovery.
-    
-    Attributes:
-        worker_id: Unique worker identifier
-        queue: Task queue to pull from
-        orchestrator: Search orchestrator for executing searches
-        cache: Cache for result persistence
-        current_task: Currently executing task
-    """
+    """Single worker that processes tasks from queue."""
     
     def __init__(
         self,
@@ -35,15 +22,6 @@ class Worker:
         orchestrator: SearchOrchestrator,
         cache: SearchCache,
     ):
-        """
-        Initialize worker.
-        
-        Args:
-            worker_id: Unique identifier for this worker
-            queue: TaskQueue to pull tasks from
-            orchestrator: SearchOrchestrator for executing searches
-            cache: SearchCache for result persistence
-        """
         self.worker_id = worker_id
         self.queue = queue
         self.orchestrator = orchestrator
@@ -57,7 +35,6 @@ class Worker:
         
         while not self._stop_event.is_set():
             try:
-                # Get next task (with timeout for responsiveness)
                 task = await self.queue.dequeue(timeout=1.0)
                 
                 if task is None:
@@ -71,22 +48,14 @@ class Worker:
                 logger.info(f"Worker {self.worker_id} cancelled")
                 break
             except Exception as e:
-                logger.error(f"Worker {self.worker_id} error: {e}", exc_info=True)
+                logger.error(f"Worker {self.worker_id} error: {e}")
                 if self.current_task:
-                    await self.queue.fail_task(
-                        self.current_task.task_id,
-                        f"Worker error: {e}"
-                    )
+                    await self.queue.fail_task(self.current_task.task_id, f"Worker error: {e}")
         
         logger.info(f"Worker {self.worker_id} stopped")
     
     async def _execute_task(self, task: SearchTask):
-        """
-        Execute a single search task.
-        
-        Args:
-            task: Task to execute
-        """
+        """Execute a single search task."""
         logger.info(
             f"Worker {self.worker_id} executing task {task.task_id[:8]}: "
             f"{task.source} query='{task.query[:50]}...'"
@@ -102,11 +71,7 @@ class Worker:
                         f"({progress['total_papers']} papers)"
                     )
                     papers = self.cache.get_cached_papers(task.cache_query_id)
-                    await self.queue.complete_task(
-                        task.task_id,
-                        papers,
-                        from_cache=True
-                    )
+                    await self.queue.complete_task(task.task_id, papers, from_cache=True)
                     return
             
             # Execute search
@@ -120,17 +85,11 @@ class Worker:
                 resume=task.resume_from_cache,
             )
             
-            # Update progress
             task.papers_fetched = len(papers)
-            
-            # Complete task
             await self.queue.complete_task(task.task_id, papers)
             
         except Exception as e:
-            logger.error(
-                f"Task {task.task_id[:8]} failed: {e}",
-                exc_info=True
-            )
+            logger.error(f"Task {task.task_id[:8]} failed: {e}", exc_info=True)
             await self.queue.fail_task(task.task_id, str(e))
     
     def stop(self):
@@ -139,25 +98,7 @@ class Worker:
 
 
 class WorkerPool:
-    """
-    Pool of workers that process tasks concurrently.
-    
-    The worker pool manages multiple Worker instances, allowing parallel
-    execution of search tasks. It handles worker lifecycle, graceful
-    shutdown, and ensures all workers complete cleanly.
-    
-    Features:
-    - Configurable concurrency
-    - Graceful shutdown with timeout
-    - Worker health monitoring
-    - Automatic cleanup
-    
-    Example:
-        >>> pool = WorkerPool(queue, orchestrator, cache, num_workers=3)
-        >>> await pool.start()
-        >>> await pool.wait_until_complete()
-        >>> await pool.stop()
-    """
+    """Pool of workers that process tasks concurrently."""
     
     def __init__(
         self,
@@ -166,22 +107,13 @@ class WorkerPool:
         cache: SearchCache,
         num_workers: int = 3,
     ):
-        """
-        Initialize worker pool.
-        
-        Args:
-            queue: TaskQueue to pull tasks from
-            orchestrator: SearchOrchestrator for executing searches
-            cache: SearchCache for result persistence
-            num_workers: Number of concurrent workers (default: 3)
-        """
         self.queue = queue
         self.orchestrator = orchestrator
         self.cache = cache
         self.num_workers = num_workers
         
-        self.workers: list[Worker] = []
-        self.worker_tasks: list[asyncio.Task] = []
+        self.workers: list = []
+        self.worker_tasks: list = []
         self._running = False
     
     async def start(self):
@@ -208,22 +140,15 @@ class WorkerPool:
         logger.info("Worker pool started")
     
     async def stop(self, timeout: float = 30.0):
-        """
-        Stop all workers gracefully.
-        
-        Args:
-            timeout: Max seconds to wait for workers to finish (default: 30)
-        """
+        """Stop all workers gracefully."""
         if not self._running:
             return
         
         logger.info("Stopping worker pool...")
         
-        # Signal all workers to stop
         for worker in self.workers:
             worker.stop()
         
-        # Wait for workers to finish (with timeout)
         try:
             await asyncio.wait_for(
                 asyncio.gather(*self.worker_tasks, return_exceptions=True),
@@ -238,23 +163,11 @@ class WorkerPool:
         logger.info("Worker pool stopped")
     
     def is_running(self) -> bool:
-        """
-        Check if pool is running.
-        
-        Returns:
-            True if workers are running
-        """
+        """Check if pool is running."""
         return self._running
     
     async def wait_until_complete(self, check_interval: float = 1.0):
-        """
-        Wait until all tasks are completed.
-        
-        Polls queue until both pending and running tasks are empty.
-        
-        Args:
-            check_interval: Seconds between queue checks (default: 1.0)
-        """
+        """Wait until all tasks are completed."""
         while True:
             size = await self.queue.size()
             running = len(self.queue.running_tasks)
